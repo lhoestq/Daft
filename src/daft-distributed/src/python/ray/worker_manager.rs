@@ -8,7 +8,9 @@ use common_error::{DaftError, DaftResult};
 use common_resource_request::ResourceRequest;
 use pyo3::prelude::*;
 
-use super::{task::RayTaskResultHandle, worker::RaySwordfishWorker};
+use super::{
+    clear_flight_shuffle_state_on_workers, task::RayTaskResultHandle, worker::RaySwordfishWorker,
+};
 use crate::scheduling::{
     scheduler::WorkerSnapshot,
     task::{SwordfishTask, TaskContext, TaskResourceRequest},
@@ -162,15 +164,23 @@ impl WorkerManager for RayWorkerManager {
             return Ok(());
         }
 
-        let state = self
+        let shuffle_ids = shuffle_ids.to_vec();
+        let workers = self
             .state
             .lock()
             .expect("Failed to lock RayWorkerManagerState");
-        Python::attach(|py| {
-            for worker in state.ray_workers.values() {
-                worker.clear_flight_shuffles(py, shuffle_ids)?;
-            }
-            DaftResult::Ok(())
+        let worker_handles = Python::attach(|py| {
+            workers
+                .ray_workers
+                .values()
+                .map(|worker| worker.ray_worker_handle(py))
+                .collect::<Vec<_>>()
+        });
+        drop(workers);
+
+        let runtime = common_runtime::get_io_runtime(true);
+        runtime.block_on_current_thread(async move {
+            clear_flight_shuffle_state_on_workers(worker_handles, shuffle_ids).await
         })
     }
 
