@@ -178,9 +178,10 @@ impl WorkerManager for RayWorkerManager {
         });
         drop(workers);
 
-        let runtime = common_runtime::get_io_runtime(true);
-        runtime.block_on_current_thread(async move {
-            clear_flight_shuffle_state_on_workers(worker_handles, shuffle_ids).await
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async move {
+                clear_flight_shuffle_state_on_workers(worker_handles, shuffle_ids).await
+            })
         })
     }
 
