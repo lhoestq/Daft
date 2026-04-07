@@ -3257,7 +3257,6 @@ dependencies = [
  "daft-writers",
  "flatbuffers",
  "futures",
- "itertools 0.14.0",
  "tokio",
  "tonic",
 ]
