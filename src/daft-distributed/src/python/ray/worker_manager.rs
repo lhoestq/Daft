@@ -157,6 +157,23 @@ impl WorkerManager for RayWorkerManager {
         Ok(())
     }
 
+    fn clear_flight_shuffles(&self, shuffle_ids: &[u64]) -> DaftResult<()> {
+        if shuffle_ids.is_empty() {
+            return Ok(());
+        }
+
+        let state = self
+            .state
+            .lock()
+            .expect("Failed to lock RayWorkerManagerState");
+        Python::attach(|py| {
+            for worker in state.ray_workers.values() {
+                worker.clear_flight_shuffles(py, shuffle_ids)?;
+            }
+            DaftResult::Ok(())
+        })
+    }
+
     fn try_autoscale(&self, bundles: Vec<TaskResourceRequest>) -> DaftResult<()> {
         let (requested_num_cpus, requested_num_gpus, requested_memory_bytes) =
             bundles.iter().fold((0.0, 0.0, 0), |acc, bundle| {
